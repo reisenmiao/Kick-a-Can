@@ -19,9 +19,5 @@ class Network(nn.Module):
 
 
 if __name__ == '__main__':
-    net = Network(3, 4)
-    params = list(net.parameters())
-
-    for param in params:
-        print(param)
+    pass
 
