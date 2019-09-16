@@ -1,5 +1,5 @@
 from controller import Supervisor, Node
-from agent import Random
+from agent import Agent
 import torch
 import torch.nn.functional as F
 
@@ -9,7 +9,7 @@ timestep = int(super_visor.getBasicTimeStep())
 
 
 # 设置机器人的目标
-target = torch.tensor([-0.5, 0.0, 0.0]).view(1, -1)
+target = torch.tensor([-0.5, 0.0, 0.0])
 
 
 # 获取机器人的node
@@ -29,12 +29,14 @@ right_motor.setVelocity(0.0)
 
 
 # 设置动作和agent
-action_space = [(10.0, 10.0), (-10.0, 10.0), (10.0, -10.0), (-10.0, -10.0), (0.0, 0.0)]
-agent = Random(action_space, 3)
+action_space = 2
+state_space = 3
+max_reward = torch.tensor([1.0])
+agent = Agent(state_space, action_space)
 
 
 # 机器人开始运行
-position = torch.tensor(robot_node.getPosition()).view(1, -1)
+position = torch.tensor(robot_node.getPosition())
 
 # step counter
 step_count = 0
@@ -42,20 +44,20 @@ step_count = 0
 while super_visor.step(timestep) != -1 :
 
     # take action
-    action_index = agent.act(position)
+    action = agent.act(position)
 
-    left_motor.setVelocity(action_space[action_index.item()][0])
-    right_motor.setVelocity(action_space[action_index.item()][1])
+    left_motor.setVelocity(action[0].item())
+    right_motor.setVelocity(action[1].item())
 
     # get current state
     old_position = position
-    position = torch.tensor(robot_node.getPosition()).view(1, -1)
+    position = torch.tensor(robot_node.getPosition())
 
     # calculate reward
-    reward = torch.tensor([1 / F.pairwise_distance(position, target)])
+    reward = max_reward - torch.pairwise_distance(position.unsqueeze(0), target.unsqueeze(0))
 
     # update value function
-    agent.update(old_position, position, action_index, reward)
+    agent.update(old_position, position, action, reward)
 
 
 

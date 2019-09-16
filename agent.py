@@ -1,42 +1,68 @@
-from network import Network
+from value_network import Value_Network
+from action_network import Action_Network
 import random
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+import torch.nn as nn
 
-class Random(object):
-    def __init__(self, action_space, state_dim):
-        assert isinstance(action_space, list)
+
+class Agent(object):
+    """The world's simplest agent!"""
+    def __init__(self, state_space, action_space):
+        assert isinstance(state_space, int) and isinstance(action_space, int)
 
         self.action_space = action_space
 
-        self.Q = Network(state_dim, len(action_space))
-        self.optimizer = optim.SGD(self.Q.parameters(), lr=0.01)
+        self.value_network = Value_Network(state_space + action_space, 1)
+        self.value_optimizer = optim.Adam(self.value_network.parameters(), lr=0.001)
+
+        self.action_network = Action_Network(state_space, action_space)
+        self.action_optimizer = optim.Adam(self.action_network.parameters(), lr=0.001)
+
+        self.criterion = nn.MSELoss()
 
     def act(self, state):
-        sample = random.random()
-        if sample > 0.3:
-            with torch.no_grad():
-                q_values = self.Q(state)
+        state = state.unsqueeze(0)
 
-                return q_values.max(1)[1].view(1, 1)
+        with torch.no_grad():
 
-        else:
-            index = random.randrange(len(self.action_space))
+            return self.action_network(state).squeeze(0)
 
-            return torch.tensor([[index]], dtype=torch.long)
+    def update(self, state, next_state, action, reward):
 
-    def update(self, state, next_state, action_index, reward):
+        # update value network
 
-        state_action_value = self.Q(state).gather(1, action_index)
-        expected_state_action_value =  ( 0.9 * self.Q(next_state).max(1)[0].detach()) + reward
+        state_action = torch.cat([state, action]).unsqueeze(0)
+        state_action_value = self.value_network(state_action)
 
-        loss = F.smooth_l1_loss(state_action_value, expected_state_action_value.unsqueeze(1))
+        next_action = self.action_network(next_state).detach()
+        next_action = next_action.squeeze(0)
 
-        self.optimizer.zero_grad()
+        next_state_action = torch.cat([next_state, next_action]).unsqueeze(0)
+        next_state_action_value = self.value_network(next_state_action).detach()
 
-        loss.backward()
-        self.optimizer.step()
+        expected_state_action_value = (0.9 * next_state_action_value) + reward
+
+        value_loss = self.criterion(state_action_value, expected_state_action_value)
+
+        self.value_optimizer.zero_grad()
+
+        value_loss.backward()
+        self.value_optimizer.step()
+
+        # update action network
+
+        optim_action = self.action_network(state.unsqueeze(0)).detach()
+        optim_action = optim_action.squeeze(0)
+
+        optim_state_action = torch.cat([state, optim_action]).unsqueeze(0)
+        action_loss = -self.value_network(optim_state_action)
+
+        self.action_optimizer.zero_grad()
+
+        action_loss.backward()
+        self.action_optimizer.step()
 
 
 
