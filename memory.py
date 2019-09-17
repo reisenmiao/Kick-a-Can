@@ -1,3 +1,25 @@
 from collections import namedtuple
+import random
 
-transition = namedtuple('Transition', ('state', 'action', 'next_sate', 'reward'))
+Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
+
+
+class Memory(object):
+
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.memory = []
+        self.position = 0
+
+    def push(self, state, action, next_state, reward):
+        if len(self.memory) < self.capacity:
+            self.memory.append(None)
+
+        self.memory[self.position] = Transition(state=state, action=action, next_state=next_state, reward=reward)
+        self.position = (self.position + 1) % self.capacity
+
+    def sample(self, batch_size):
+        return random.sample(self.memory, batch_size)
+
+    def __len__(self):
+        return len(self.memory)
